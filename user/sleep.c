@@ -7,7 +7,7 @@ int
 main(int argc, char *argv[])
 {
   int cnt;
-  if(argc != 2){
+  if(argc != 2) {
     fprintf(2, "Usage: sleep [integer]\n");
     exit(1);
   }
