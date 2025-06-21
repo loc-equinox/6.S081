@@ -7,18 +7,19 @@ void sieve(int* p)
     int prime, cur; // The prime number for this process
     int newp[2], hasRight=0, pid=getpid();
     close(p[1]);
-    cur = read(p[0], (char*)&cur, 4);
-    printf("cur: %d\n", cur);
+    read(p[0], (char*)&cur, 4);
+    // printf("cur: %d\n", cur);
     prime = cur;
     if(cur > 36) {
       return;
     }
-    printf("prime %d", prime);
-    cur = read(p[0], (char*)&cur, sizeof(cur));
-    printf("cur: %d\n", cur);
-    while(cur != 0) {
+    printf("prime %d\n", prime);
+    int flag;
+    flag = read(p[0], (char*)&cur, sizeof(cur));
+    // printf("cur: %d\n", cur);
+    while(flag != 0) {
       if(cur % prime != 0) {
-        printf("cur: %d\n", cur);
+        // printf("cur: %d\n", cur);
         if(hasRight) {
           write(newp[1], (char*)&cur, sizeof(cur));
         } else {
@@ -32,7 +33,7 @@ void sieve(int* p)
           }
         }
       }
-      cur = read(p[0], (char*)&cur, sizeof(cur));
+      flag = read(p[0], (char*)&cur, sizeof(cur));
     }
     if(getpid() == pid) {
       close(p[0]);
@@ -52,11 +53,11 @@ main(int argc, char *argv[])
   } else {
     close(p[0]);
     for(int i = 2; i <= 35; i++) {
-      printf("%d\n", i);
+      // printf("%d\n", i);
       write(p[1], (char*)&i, sizeof(i));
     }
-    wait((int*)0);
     close(p[1]);
+    wait((int*)0);
   }
   exit(0);
 }
