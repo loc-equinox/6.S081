@@ -68,6 +68,6 @@ main(int argc, char *argv[])
   }
   char buf[512];
   strcpy(buf, argv[1]);
-  find(".", argv[2]);
+  find(buf, argv[2]);
   exit(0);
 }
