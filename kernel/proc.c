@@ -56,6 +56,20 @@ procinit(void)
   }
 }
 
+// Collects the number of processes
+// whose state is not UNUSED.
+uint64
+collectUnusedProc(void)
+{
+  uint64 cnt = 0;
+  for(int i = 0; i < NPROC; i++) {
+    if(proc[i].state != UNUSED) {
+      cnt++;
+    }
+  }
+  return cnt;
+}
+
 // Must be called with interrupts disabled,
 // to prevent race with process being moved
 // to a different CPU.

@@ -30,6 +30,19 @@ kinit()
   freerange(end, (void*)PHYSTOP);
 }
 
+// Collects the amount of free memory.
+uint64
+collectfreemem(void)
+{
+  uint64 num_pages = 0;
+  struct run *r = kmem.freelist;
+  while(r){
+    num_pages++;
+    r = r->next;
+  }
+  return num_pages * 4096; // magic number, bad :(
+}
+
 void
 freerange(void *pa_start, void *pa_end)
 {
