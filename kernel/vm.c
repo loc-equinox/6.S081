@@ -140,6 +140,8 @@ mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm)
   uint64 a, last;
   pte_t *pte;
 
+  // printf("va: %p; pa: %p\n", va, pa);
+
   if(size == 0)
     panic("mappages: size");
   
@@ -156,6 +158,7 @@ mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm)
     a += PGSIZE;
     pa += PGSIZE;
   }
+  // printf("pte: %p\n", pte);
   return 0;
 }
 
