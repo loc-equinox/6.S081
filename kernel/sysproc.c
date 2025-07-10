@@ -75,15 +75,43 @@ sys_sleep(void)
   return 0;
 }
 
-
-#ifdef LAB_PGTBL
+// int pgaccess(void *base, int len, void *mask);
 int
 sys_pgaccess(void)
 {
-  // lab pgtbl: your code here.
+  uint64 vastart, va;
+  int len;
+  uint64 mask, result=0;
+  if((argaddr(0, &vastart)) < 0 ||
+     (argint(1, &len) < 0) ||
+     (argaddr(2, &mask) < 0)){
+    return -1;
+  }
+  if(len > 64){
+    printf("pgaccess: len is too long\n");
+    return -1;
+  }
+  struct proc *p = myproc();
+  va = vastart;
+  for(int i = 0; i < len; i++) {
+    pte_t *pte;
+    if((pte = walk(p->pagetable, va, 0)) == 0){
+      printf("pgaccess: walk failed\n");
+      return 0;
+    }
+    if((*pte & PTE_V) == 0){
+      printf("pgaccess: invalid page\n");
+      return 0;
+    }
+    if((*pte & PTE_A) != 0){
+      result |= (1L << i);
+      *pte &= (~PTE_A);
+    }
+    va += PGSIZE;
+  }
+  copyout(p->pagetable, mask, (char *)&result, sizeof(result));
   return 0;
 }
-#endif
 
 uint64
 sys_kill(void)
