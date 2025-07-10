@@ -1,0 +1,8 @@
+1. Which other xv6 system call(s) could be made 
+faster using this shared page? Explain how.
+
+The system call uptime(). When the uptime is requested
+by a certain process, the kernel can put the info in the process's
+USYSCALL page, without having to go down the 3-level pagetable.
+After switching back to user mode, the user program can
+fetch the uptime info from the USYSCALL page.
