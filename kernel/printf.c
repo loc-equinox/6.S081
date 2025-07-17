@@ -127,6 +127,22 @@ panic(char *s)
 }
 
 void
+backtrace()
+{
+  printf("backtrace:\n");
+  uint64 fp = r_fp();
+  uint64 retaddr = *(uint64*)(fp - 8);
+  uint64 prevfp = *(uint64*)(fp - 16);
+  while(prevfp >= PGROUNDDOWN(fp)
+        && prevfp <= PGROUNDUP(fp)){
+    printf("%p\n", retaddr);
+    fp = *(uint64*)(fp - 16);
+    retaddr = *(uint64*)(fp - 8);
+    prevfp = *(uint64*)(fp - 16);
+  }
+}
+
+void
 printfinit(void)
 {
   initlock(&pr.lock, "pr");
