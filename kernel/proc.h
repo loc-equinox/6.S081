@@ -3,7 +3,7 @@ struct context {
   uint64 ra;
   uint64 sp;
 
-  // callee-saved
+// callee-saved
   uint64 s0;
   uint64 s1;
   uint64 s2;
@@ -105,4 +105,11 @@ struct proc {
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
+  uint64 alarmhandler;          
+  uint64 alarmitv;             // The alarm interval
+  uint64 tickcount;            // Number of ticks passed since
+                               // last call to alarm handler
+  struct trapframe *alarmframe;// Data page for sigreturn
+  uint64 handlerstatus;        // Check whether alarm handler
+                               // has returned from execution.
 };

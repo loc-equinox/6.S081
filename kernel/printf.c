@@ -115,18 +115,6 @@ printf(char *fmt, ...)
 }
 
 void
-panic(char *s)
-{
-  pr.locking = 0;
-  printf("panic: ");
-  printf(s);
-  printf("\n");
-  panicked = 1; // freeze uart output from other CPUs
-  for(;;)
-    ;
-}
-
-void
 backtrace()
 {
   printf("backtrace:\n");
@@ -140,6 +128,19 @@ backtrace()
     retaddr = *(uint64*)(fp - 8);
     prevfp = *(uint64*)(fp - 16);
   }
+}
+
+void
+panic(char *s)
+{
+  pr.locking = 0;
+  printf("panic: ");
+  printf(s);
+  printf("\n");
+  backtrace();
+  panicked = 1; // freeze uart output from other CPUs
+  for(;;)
+    ;
 }
 
 void

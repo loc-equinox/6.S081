@@ -93,12 +93,13 @@ test1()
   if(count < 10){
     printf("\ntest1 failed: too few calls to the handler\n");
   } else if(i != j){
+    printf("i:%d j:%d\n", i, j);
     // the loop should have called foo() i times, and foo() should
     // have incremented j once per call, so j should equal i.
-    // once possible source of errors is that the handler may
+    // one possible source of errors is that the handler may
     // return somewhere other than where the timer interrupt
     // occurred; another is that that registers may not be
-    // restored correctly, causing i or j or the address ofj
+    // restored correctly, causing i or j or the address of j
     // to get an incorrect value.
     printf("\ntest1 failed: foo() executed fewer times than it was called\n");
   } else {
