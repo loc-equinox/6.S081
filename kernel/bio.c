@@ -49,6 +49,7 @@ binit(void)
 
   initlock(&bcache.lock, "bcache");
 
+  /*
   // Create linked list of buffers
   bcache.head.prev = &bcache.head;
   bcache.head.next = &bcache.head;
@@ -59,6 +60,25 @@ binit(void)
     bcache.head.next->prev = b;
     bcache.head.next = b;
   }
+  */
+  // Initialize hash table locks.
+  for(int i = 0; i < NBUCKETS; i++)
+    initlock(&bcache.buclock[i], "bcache.bucket");
+
+  // Initialize the buffers.
+  for(b = bcache.buf; b < bcache.buf+NBUF; b++){
+    initsleeplock(&b->lock, "buffer");
+  }
+
+  // Initialize the hash table.
+  for(int i = 0; i < NBUCKETS; i++)
+    for(int j = 0; j < NSLOTS; j++)
+      bcache.valid[i][j] = 0;
+  for(int i = 0; i < NBUCKETS; i++)
+    for(int j=0, k=i; j<NSLOTS && k<NBUF; j++, k+=NBUCKETS){
+      bcache.buc[i][j] = k;
+      bcache.valid[i][j] = 1;
+    }
 }
 
 // Look through buffer cache for block on device dev.
@@ -104,6 +124,7 @@ bget(uint dev, uint blockno)
       b = &bcache.buf[bcache.buc[bucno][i]];
       if(b->dev == dev && b->blockno == blockno){
         b->refcnt++;
+        b->bticks = ticks;
         release(&bcache.buclock[bucno]);
         acquiresleep(&b->lock);
         return b;
@@ -120,6 +141,7 @@ bget(uint dev, uint blockno)
       b = &bcache.buf[bcache.buc[bucno][i]];
       if(b->dev == dev && b->blockno == blockno){
         b->refcnt++;
+        b->bticks = ticks;
         release(&bcache.lock);
         release(&bcache.buclock[bucno]);
         acquiresleep(&b->lock);
@@ -129,10 +151,12 @@ bget(uint dev, uint blockno)
   }
   release(&bcache.buclock[bucno]);
   // Re-check completed, ready to alloc new buf
-  int srcbno = -1;
+  int srcbno = -1, srcsno;
   uint mxticks = 0x7ffffff, bufid = -1;
   struct buf *tb;
+  // printf("bucno: %d\n", bucno);
   for(int i = 0; i < NBUCKETS; i++){
+    // printf("acquiring %d\n", i);
     acquire(&bcache.buclock[i]);
     for(int j = 0; j < NSLOTS; j++){
       if(bcache.valid[i][j] == 0)
@@ -141,19 +165,42 @@ bget(uint dev, uint blockno)
       if(tb->refcnt == 0 && tb->bticks < mxticks){
         b = tb;
         mxticks = tb->bticks;
+        if(srcbno >= 0 && srcbno != i){
+          // printf("releasing %d\n", srcbno);
+          release(&bcache.buclock[srcbno]);
+        }
         srcbno = i;
+        srcsno = j;
         bufid = bcache.buc[i][j];
       } 
+    }
+    if(srcbno != i){
+      // printf("releasing %d\n", i);
+      release(&bcache.buclock[i]);
     }
   }
   if(bufid == -1)
     panic("bget: no buffers");
   // Found a buffer, check whether there's an
   // empty slot for it.
-  // Note that we are now holding the lock
-  // for this bucket(and all the other
-  // buckets), so modifying valid[bucno] is
-  // safe. 
+  // Note that we are only holding one lock, which
+  // is buclock[srcbno], so we have to check whether
+  // srcbno equals to bucno and act accordingly.
+  // printf("valid[%d][%d]\n\n", srcbno, srcsno);
+  bcache.valid[srcbno][srcsno] = 0;
+  if(srcbno != bucno){
+    acquire(&bcache.buclock[bucno]);
+  }
+  /*
+  printf("bucno: %d\n", bucno);
+  printf("valid: ");
+  for(int i = 0; i < NSLOTS; i++)
+    printf("%d ", bcache.valid[bucno][i]);
+  printf("\nbuc: ");
+  for(int i = 0; i < NSLOTS; i++)
+    printf("%d ", bcache.buc[bucno][i]);
+  printf("\n\n");
+  */
   for(int i = 0; i < NSLOTS; i++){
     if(bcache.valid[bucno][i] == 0){
       // Found a slot.
@@ -163,9 +210,11 @@ bget(uint dev, uint blockno)
       b->blockno = blockno;
       b->valid = 0;
       b->refcnt = 1;
+      b->bticks = ticks;
       release(&bcache.lock);
-      for(int j = 0; j < NBUCKETS; j++){
-        release(&bcache.buclock[j]);
+      release(&bcache.buclock[srcbno]);
+      if(srcbno != bucno){
+        release(&bcache.buclock[bucno]);
       }
       acquiresleep(&b->lock);
       return b;
@@ -228,16 +277,18 @@ brelse(struct buf *b)
 
 void
 bpin(struct buf *b) {
-  acquire(&bcache.lock);
+  uint bucno = bchash(b->blockno);
+  acquire(&bcache.buclock[bucno]);
   b->refcnt++;
-  release(&bcache.lock);
+  release(&bcache.buclock[bucno]);
 }
 
 void
 bunpin(struct buf *b) {
-  acquire(&bcache.lock);
+  uint bucno = bchash(b->blockno);
+  acquire(&bcache.buclock[bucno]);
   b->refcnt--;
-  release(&bcache.lock);
+  release(&bcache.buclock[bucno]);
 }
 
 

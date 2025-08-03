@@ -12,4 +12,4 @@
 #define FSSIZE       1000  // size of file system in blocks
 #define MAXPATH      128   // maximum file path name
 #define NBUCKETS     13    // number of buffer cache buckets
-#define NSLOTS       5     // number of slots per bcache bucket
+#define NSLOTS       15     // number of slots per bcache bucket
