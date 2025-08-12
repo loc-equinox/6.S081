@@ -314,6 +314,31 @@ sys_open(void)
       end_op();
       return -1;
     }
+    if(ip->type == T_SYMLINK && !(omode & O_NOFOLLOW)){
+      uint reclv = 1;
+      while(reclv < MAXSYMLINKLV){
+        char path[BSIZE];
+        int n;
+        if((n = readi(ip, 0, (uint64)path, 0, BSIZE)) < 0){
+          panic("sys_open: symlink read");
+        }
+        iunlockput(ip);
+        if((ip = namei(path)) == 0){
+          end_op();
+          return -1;
+        }
+        ilock(ip);
+        if(ip->type == T_FILE)
+          break;
+        reclv += 1;
+      }
+      if(reclv >= MAXSYMLINKLV){
+        printf("Loop detected in symlink\n");
+        iunlockput(ip);
+        end_op();
+        return -1;
+      }
+    }
   }
 
   if(ip->type == T_DEVICE && (ip->major < 0 || ip->major >= NDEV)){
@@ -482,5 +507,32 @@ sys_pipe(void)
     fileclose(wf);
     return -1;
   }
+  return 0;
+}
+
+uint64
+sys_symlink(void)
+{
+  char path[MAXPATH], target[MAXPATH];
+  struct inode *ip;
+  int n;
+
+  if((n = argstr(0, target, MAXPATH)) < 0 || argstr(1, path, MAXPATH) < 0)
+    return -1;
+  
+  begin_op();
+
+  ip = create(path, T_SYMLINK, 0, 0);  
+  if(ip == 0){
+    end_op();
+    return -1;
+  }
+
+  if(writei(ip, 0, (uint64)target, 0, n) != n)
+    panic("symlink: writei");
+
+  iunlockput(ip);
+  end_op();
+  
   return 0;
 }
