@@ -135,6 +135,11 @@ found:
     return 0;
   }
 
+  for(int i = 0; i < NVMA; i++){
+    p->pvma[i].used = 0;
+  }
+  p->vmatop = MAXHEAPVA;
+
   // Set up new context to start executing at forkret,
   // which returns to user space.
   memset(&p->context, 0, sizeof(p->context));
@@ -289,6 +294,15 @@ fork(void)
   }
   np->sz = p->sz;
 
+  // Copy vma from parent to child
+  for(int i = 0; i < NVMA; i++){
+    if(p->pvma[i].used == 1){
+      np->pvma[i] = p->pvma[i];
+      printf("fork filedup id: %d\n", i);
+      filedup(p->pvma[i].file);
+    }
+  }
+
   // copy saved user registers.
   *(np->trapframe) = *(p->trapframe);
 
@@ -343,6 +357,15 @@ exit(int status)
 
   if(p == initproc)
     panic("init exiting");
+
+  // munmap all vmas in use
+  for(int i = 0; i < NVMA; i++){
+    if(p->pvma[i].used == 1 && p->pvma[i].count > 0){
+      if(munmap_range(p->pvma[i].addr, p->pvma[i].length, -1) != 0)
+        panic("exit: munmap failed");
+      p->pvma[i].used = 0;
+    }
+  }
 
   // Close all open files.
   for(int fd = 0; fd < NOFILE; fd++){

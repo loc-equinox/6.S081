@@ -5,6 +5,11 @@
 #include "riscv.h"
 #include "defs.h"
 #include "fs.h"
+#include "spinlock.h"
+#include "sleeplock.h"
+#include "file.h"
+#include "proc.h"
+#include "fcntl.h"
 
 /*
  * the kernel's page table.
@@ -338,6 +343,49 @@ uvmclear(pagetable_t pagetable, uint64 va)
   if(pte == 0)
     panic("uvmclear");
   *pte &= ~PTE_U;
+}
+
+int
+mmaptrap(pagetable_t pagetable, uint64 va)
+{
+  struct proc *p = myproc();
+  // Check which vm area it belongs to
+  uint64 pva = PGROUNDDOWN(va);
+  int id = -1;
+  struct vma *tvma;
+  for(int i = 0; i < NVMA; i++){
+    tvma = &(p->pvma[i]);
+    if(pva >= tvma->addr && pva < tvma->addr + tvma->length){
+      id = i;
+      break;
+    }
+  }
+  if(id == -1)
+    return -1;
+  // printf("vma id: %d\n", id);
+  
+  // Allocate a page
+  char *mem;
+  if((mem = kalloc()) == 0)
+    panic("mmap: kalloc failed");
+  int perm = PTE_U | PTE_V;
+  if(p->pvma[id].perm | PROT_READ)
+    perm |= PTE_R;
+  if(p->pvma[id].perm | PROT_WRITE)
+    perm |= PTE_W;
+  mappages(pagetable, pva, PGSIZE, (uint64)mem, perm);
+  memset(mem, 0, PGSIZE);
+
+  // Read the corresponding bytes in file
+  // uint off = pva - p->pvma[id].addr;
+  struct inode *ip = p->pvma[id].file->ip;
+  uint off = pva - p->pvma[id].addr;
+  // printf("offset: %d, pva: %p\n", off, pva);
+  ilock(ip);
+  readi(ip, 1, pva, off, PGSIZE);
+  iunlock(ip);
+  
+  return 0;
 }
 
 // Copy from kernel to user.

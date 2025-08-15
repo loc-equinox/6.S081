@@ -29,6 +29,7 @@ int             exec(char*, char**);
 struct file*    filealloc(void);
 void            fileclose(struct file*);
 struct file*    filedup(struct file*);
+void            filedecref(struct file*);
 void            fileinit(void);
 int             fileread(struct file*, uint64, int n);
 int             filestat(struct file*, uint64 addr);
@@ -139,6 +140,9 @@ int             fetchstr(uint64, char*, int);
 int             fetchaddr(uint64, uint64*);
 void            syscall();
 
+// sysproc.c
+uint64          munmap_range(uint64 addr, uint length, int idx);
+
 // trap.c
 extern uint     ticks;
 void            trapinit(void);
@@ -166,6 +170,7 @@ int             uvmcopy(pagetable_t, pagetable_t, uint64);
 void            uvmfree(pagetable_t, uint64);
 void            uvmunmap(pagetable_t, uint64, uint64, int);
 void            uvmclear(pagetable_t, uint64);
+pte_t*          walk(pagetable_t pagetable, uint64 va, int alloc);
 uint64          walkaddr(pagetable_t, uint64);
 int             copyout(pagetable_t, uint64, char *, uint64);
 int             copyin(pagetable_t, char *, uint64, uint64);
