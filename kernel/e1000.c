@@ -20,6 +20,7 @@ static struct mbuf *rx_mbufs[RX_RING_SIZE];
 static volatile uint32 *regs;
 
 struct spinlock e1000_lock;
+struct spinlock e1000_recv_lock;
 
 // called by pci_init().
 // xregs is the memory address at which the
@@ -30,6 +31,7 @@ e1000_init(uint32 *xregs)
   int i;
 
   initlock(&e1000_lock, "e1000");
+  initlock(&e1000_recv_lock, "e1000_recv");
 
   regs = xregs;
 
@@ -102,7 +104,26 @@ e1000_transmit(struct mbuf *m)
   // the TX descriptor ring so that the e1000 sends it. Stash
   // a pointer so that it can be freed after sending.
   //
-  
+  // printf("trsm acquiring...\n");
+  acquire(&e1000_lock);
+  uint32 rid = regs[E1000_TDT];
+  if((tx_ring[rid].status & E1000_TXD_STAT_DD) == 0){
+    // printf("trsm releasing...\n");
+    release(&e1000_lock);
+    return -1; 
+  }
+  if(tx_mbufs[rid])
+    mbuffree(tx_mbufs[rid]);
+  tx_ring[rid].addr = (uint64)m->head;
+  tx_ring[rid].length = (uint16)m->len;
+
+  // set permission(RTFM)
+  tx_ring[rid].cmd = E1000_TXD_CMD_EOP | E1000_TXD_CMD_RS;
+
+  tx_mbufs[rid] = m;
+  regs[E1000_TDT] = (regs[E1000_TDT] + 1) % TX_RING_SIZE;
+  // printf("trsm releasing...\n");
+  release(&e1000_lock);
   return 0;
 }
 
@@ -115,6 +136,32 @@ e1000_recv(void)
   // Check for packets that have arrived from the e1000
   // Create and deliver an mbuf for each packet (using net_rx()).
   //
+  // printf("recv acquiring...\n");
+  acquire(&e1000_recv_lock);
+  while(1){
+    uint32 rid = (regs[E1000_RDT] + 1) % RX_RING_SIZE;
+    if (rid == regs[E1000_RDH])
+    {
+      // buffer queue is full
+      // printf("recv releasing : 1...\n");
+      release(&e1000_recv_lock);
+      return;
+    }
+    if ((rx_ring[rid].status & E1000_RXD_STAT_DD) == 0)
+      break;
+    rx_mbufs[rid]->len = rx_ring[rid].length;
+    net_rx(rx_mbufs[rid]);
+    rx_mbufs[rid] = mbufalloc(0);
+    if (!rx_mbufs[rid])
+      panic("e1000_recv");
+    rx_ring[rid].addr = (uint64)rx_mbufs[rid]->head;
+    rx_ring[rid].status = 0;
+    regs[E1000_RDT] = rid;
+    // break;
+  }
+  // printf("recv releasing : 0 ...\n");
+  release(&e1000_recv_lock);
+  return;
 }
 
 void
